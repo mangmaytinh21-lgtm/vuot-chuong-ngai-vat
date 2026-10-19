@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vượt chướng ngại vật - Chinh phục thử thách</title>
+<style>
+  :root { --blue:#1677d2; --dark:#17324d; --gold:#ffd166; --green:#22a06b; --red:#d83a52; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Arial,Helvetica,sans-serif; color:var(--dark);
+    background:linear-gradient(180deg,#dff5ff 0%,#f7fbff 55%,#e7f7e9 100%); }
+  .wrap { max-width:1000px; margin:0 auto; padding:18px 14px 28px; }
+  header { text-align:center; margin-bottom:14px; }
+  h1 { margin:4px 0 8px; color:#075aa5; font-size:clamp(25px,4vw,38px); }
+  .subtitle { margin:0; font-size:16px; }
+  .hud { display:flex; justify-content:center; flex-wrap:wrap; gap:10px; margin:14px 0; }
+  .pill { background:white; border:2px solid #c6e7fa; border-radius:999px; padding:9px 15px; font-weight:bold; box-shadow:0 3px 0 #cde7f4; }
+  .game-frame { background:#fff; border:3px solid #8bc9ef; border-radius:18px; overflow:hidden; box-shadow:0 12px 28px #154c6c20; }
+  canvas { display:block; width:100%; height:auto; background:#c9f0ff; }
+  .controls { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; padding:14px; background:#f4fbff; }
+  button { border:0; border-radius:12px; padding:12px 18px; font-size:16px; font-weight:bold; cursor:pointer; transition:transform .08s,filter .15s; }
+  button:active { transform:scale(.97); }
+  button:focus-visible { outline:3px solid #ffb703; outline-offset:3px; }
+  .primary { background:var(--blue); color:white; box-shadow:0 4px 0 #075aa5; }
+  .jump { background:#ffbe3d; color:#573900; box-shadow:0 4px 0 #d99111; min-width:150px; }
+  .secondary { background:#e2f2fc; color:#075aa5; }
+  .instructions { background:#fff; border-radius:14px; padding:14px 18px; margin-top:14px; line-height:1.6; border:1px solid #cce9f8; }
+  .instructions strong { color:#075aa5; }
+  .modal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:16px; background:#09253bb8; z-index:10; }
+  .modal.show { display:flex; }
+  .dialog { width:min(560px,100%); background:white; border-radius:20px; padding:22px; box-shadow:0 18px 55px #001d3580; }
+  .dialog h2 { margin:0 0 8px; color:#075aa5; }
+  #questionText { font-size:19px; font-weight:bold; line-height:1.45; margin:14px 0; }
+  .answers { display:grid; gap:9px; }
+  .answer { text-align:left; background:#eff8ff; border:2px solid #c8e7f8; color:#17324d; width:100%; }
+  .answer:hover { filter:brightness(.97); }
+  .feedback { margin-top:13px; padding:12px; border-radius:10px; font-weight:bold; display:none; line-height:1.45; }
+  .feedback.good { display:block; color:#12683f; background:#e1f8eb; }
+  .feedback.bad { display:block; color:#9d1c32; background:#ffe8ec; }
+  .dialog-actions { margin-top:14px; display:flex; justify-content:flex-end; gap:8px; }
+  .small { font-size:13px; color:#49677c; }
+  @media(max-width:520px) { .wrap{padding:12px 8px 22px}.pill{font-size:14px;padding:8px 11px}.controls button{flex:1}.dialog{padding:18px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🏃 VƯỢT CHƯỚNG NGẠI VẬT</h1>
+    <p class="subtitle">Nhảy khéo léo – trả lời chính xác – chinh phục thử thách!</p>
+  </header>
+  <div class="hud" aria-live="polite">
+    <div class="pill">⭐ Điểm: <span id="score">0</span></div>
+    <div class="pill">🚧 Chướng ngại vật: <span id="passed">0</span>/10</div>
+    <div class="pill">❓ Câu hỏi: 5</div>
+  </div>
+  <div class="game-frame">
+    <canvas id="game" width="960" height="400" aria-label="Khu vực trò chơi vượt chướng ngại vật"></canvas>
+    <div class="controls">
+      <button class="jump" id="jumpBtn">⬆ NHẢY</button>
+      <button class="primary" id="startBtn">▶ BẮT ĐẦU / CHƠI LẠI</button>
+    </div>
+  </div>
+  <div class="instructions">
+    <strong>📌 Cách chơi</strong><br>
+    • Nhấn <strong>Phím cách</strong>, phím <strong>↑</strong> hoặc nút <strong>NHẢY</strong> để vượt vật cản.<br>
+    • Có <strong>10 chướng ngại vật</strong>; 5 vật cản có dấu ❓ sẽ xuất hiện câu hỏi nếu bạn va chạm.<br>
+    • Trả lời đúng: <strong>cộng 10 điểm và được đi tiếp</strong>. Trả lời sai: <strong>bạn phải dừng cuộc chơi</strong>.<br>
+    • Nếu va vào vật cản không có câu hỏi, cuộc chơi kết thúc. Nhảy qua vật cản thì không cần trả lời.
+  </div>
+  <p class="small">Gợi ý: Bạn có thể thay câu hỏi trong phần QUESTIONS ở cuối tệp index.html để phù hợp với bài học của mình.</p>
+</div>
+
+<div class="modal" id="questionModal" role="dialog" aria-modal="true" aria-labelledby="questionTitle">
+  <div class="dialog">
+    <h2 id="questionTitle">❓ Thử thách kiến thức</h2>
+    <div id="questionText"></div>
+    <div class="answers" id="answers"></div>
+    <div class="feedback" id="feedback" aria-live="polite"></div>
+    <div class="dialog-actions">
+      <button class="primary" id="continueBtn" style="display:none">Tiếp tục ➜</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const passedEl = document.getElementById('passed');
+  const modal = document.getElementById('questionModal');
+  const questionText = document.getElementById('questionText');
+  const answersEl = document.getElementById('answers');
+  const feedbackEl = document.getElementById('feedback');
+  const continueBtn = document.getElementById('continueBtn');
+
+  // Có thể sửa nội dung 5 câu hỏi tại đây.
+  const QUESTIONS = [
+    { q: 'Khi có một khoản tiền nhỏ, em nên ưu tiên điều gì?', a: ['Mua món đồ đang thích ngay', 'Chi cho nhu cầu cần thiết trước', 'Mua theo bạn bè'], correct: 1 },
+    { q: 'Đâu là một nhu cầu thiết yếu?', a: ['Nước uống khi khát', 'Đồ chơi mới dù đã có nhiều', 'Món đồ đang thịnh hành'], correct: 0 },
+    { q: 'Trước khi mua một món đồ, cách làm nào hợp lý?', a: ['Mua ngay không cần nghĩ', 'Vay tiền để mua cho bằng bạn', 'Xem món đồ có thật sự cần và phù hợp túi tiền không'], correct: 2 },
+    { q: '“Muốn” khác “cần” ở điểm nào?', a: ['Hai khái niệm hoàn toàn giống nhau', '“Cần” phục vụ nhu cầu thiết yếu; “muốn” là điều mình thích', 'Điều mình muốn luôn phải mua'], correct: 1 },
+    { q: 'Cách nào giúp kiểm soát chi tiêu tốt hơn?', a: ['Lập kế hoạch chi tiêu và theo dõi số tiền', 'Tiêu hết tiền ngay khi có', 'Mua mọi thứ được quảng cáo'], correct: 0 }
+  ];
+
+  const W = canvas.width, H = canvas.height, groundY = 326;
+  let raf = null, running = false, over = false, pausedForQuestion = false;
+  let score = 0, passed = 0, speed = 4.2, frame = 0, nextObstacle = 0;
+  let player, obstacles, activeQuestionObstacle = null, answeredQuestions = new Set();
+
+  function resetGame() {
+    if (raf) cancelAnimationFrame(raf);
+    score = 0; passed = 0; speed = 4.2; frame = 0; nextObstacle = 0;
+    running = true; over = false; pausedForQuestion = false; activeQuestionObstacle = null;
+    answeredQuestions = new Set();
+    player = { x: 135, y: groundY - 52, w: 42, h: 52, vy: 0, jumping: false };
+    // 10 chướng ngại vật; vật số 2, 4, 6, 8, 10 có câu hỏi.
+    obstacles = Array.from({length:10}, (_, i) => ({
+      id: i + 1, x: 620 + i * 340, w: 38, h: 48,
+      question: [2,4,6,8,10].includes(i + 1), done: false, collided: false
+    }));
+    scoreEl.textContent = score; passedEl.textContent = passed;
+    hideQuestion();
+    draw();
+    raf = requestAnimationFrame(loop);
+  }
+
+  function jump() {
+    if (!running || over || pausedForQuestion) return;
+    if (!player.jumping) {
+      player.vy = -13.5;
+      player.jumping = true;
+    }
+  }
+
+  function loop() {
+    if (!running || over || pausedForQuestion) return;
+    frame++;
+    // Tăng tốc nhẹ theo tiến trình, nhưng vẫn đủ thời gian để nhảy.
+    speed = Math.min(6.2, 4.2 + passed * 0.12);
+    player.y += player.vy;
+    player.vy += 0.62;
+    if (player.y + player.h >= groundY) {
+      player.y = groundY - player.h;
+      player.vy = 0;
+      player.jumping = false;
+    }
+    obstacles.forEach(o => {
+      if (!o.done) o.x -= speed;
+      if (!o.done && !o.collided && intersects(player, o)) {
+        if (o.question) {
+          o.collided = true;
+          pausedForQuestion = true;
+          activeQuestionObstacle = o;
+          showQuestion(o);
+        } else {
+          endGame(false, 'Bạn đã va vào chướng ngại vật không có câu hỏi!');
+        }
+      }
+      if (!o.done && o.x + o.w < 0) {
+        o.done = true;
+        passed++;
+        passedEl.textContent = passed;
+      }
+    });
+    if (passed >= 10) {
+      endGame(true, 'Xuất sắc! Bạn đã vượt qua cả 10 chướng ngại vật.');
+    }
+    draw();
+    if (running && !over && !pausedForQuestion) raf = requestAnimationFrame(loop);
+  }
+
+  function intersects(p, o) {
+    // Thu nhỏ vùng va chạm một chút để thao tác tự nhiên hơn.
+    return p.x + p.w - 7 > o.x + 4 && p.x + 7 < o.x + o.w - 3 &&
+           p.y + p.h - 3 > groundY - o.h && p.y + 5 < groundY;
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    // Trời và mây
+    const sky = ctx.createLinearGradient(0,0,0,H);
+    sky.addColorStop(0,'#a7e4ff'); sky.addColorStop(1,'#effcff');
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#fff'; cloud(120 + (frame*.25)%1000, 72); cloud(470 + (frame*.15)%900, 112); cloud(780 + (frame*.2)%900, 60);
+    // đồi
+    ctx.fillStyle='#9de1a1';
+    ctx.beginPath(); ctx.moveTo(0,groundY); ctx.quadraticCurveTo(180,210,340,groundY); ctx.quadraticCurveTo(570,235,760,groundY); ctx.lineTo(W,groundY); ctx.fill();
+    // mặt đất
+    ctx.fillStyle='#69c76b'; ctx.fillRect(0,groundY,W,H-groundY);
+    ctx.fillStyle='#379b49'; ctx.fillRect(0,groundY,W,8);
+    ctx.fillStyle='#f6d77a';
+    for(let x=-(frame*speed*.7)%60; x<W; x+=60) ctx.fillRect(x,groundY+34,32,5);
+    // Cờ/nhãn
+    ctx.fillStyle='#155e9a'; ctx.font='bold 18px Arial'; ctx.fillText('ĐƯỜNG ĐUA THỬ THÁCH',22,30);
+    // người chơi
+    drawPlayer();
+    // obstacles
+    obstacles.forEach(o => {
+      if (o.done || o.x > W+10 || o.x+o.w < -10) return;
+      ctx.fillStyle = o.question ? '#f7a928' : '#db654c';
+      ctx.fillRect(o.x,groundY-o.h,o.w,o.h);
+      ctx.fillStyle = o.question ? '#8a4b00' : '#873321';
+      ctx.fillRect(o.x+5,groundY-o.h+7,o.w-10,7);
+      ctx.fillStyle='#fff'; ctx.font='bold 23px Arial'; ctx.textAlign='center';
+      ctx.fillText(o.question?'?':'!',o.x+o.w/2,groundY-o.h+34);
+      ctx.textAlign='left';
+      ctx.fillStyle='#17324d'; ctx.font='bold 12px Arial'; ctx.fillText(String(o.id),o.x+13,groundY+20);
+    });
+    if (!running && !over) {
+      ctx.fillStyle='#0d3555'; ctx.font='bold 26px Arial'; ctx.textAlign='center';
+      ctx.fillText('NHẤN “BẮT ĐẦU” ĐỂ CHƠI',W/2,185); ctx.textAlign='left';
+    }
+    if (over) {
+      ctx.fillStyle='#08263caa'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='#fff'; ctx.textAlign='center';
+      ctx.font='bold 34px Arial'; ctx.fillText(passed>=10?'CHIẾN THẮNG!':'KẾT THÚC TRÒ CHƠI',W/2,170);
+      ctx.font='bold 22px Arial'; ctx.fillText('Điểm của bạn: '+score,W/2,213);
+      ctx.font='18px Arial'; ctx.fillText('Nhấn “CHƠI LẠI” để thử sức lần nữa',W/2,250);
+      ctx.textAlign='left';
+    }
+  }
+
+  function cloud(x,y) {
+    x = x % (W+180) - 80;
+    ctx.fillStyle='#ffffffcc'; ctx.beginPath();
+    ctx.arc(x,y,20,0,Math.PI*2); ctx.arc(x+24,y-10,25,0,Math.PI*2);
+    ctx.arc(x+52,y,20,0,Math.PI*2); ctx.fill();
+  }
+  function drawPlayer() {
+    const p=player;
+    // bóng
+    ctx.fillStyle='#2b6b4b33'; ctx.beginPath(); ctx.ellipse(p.x+p.w/2,groundY+3,25,6,0,0,Math.PI*2); ctx.fill();
+    // chân
+    ctx.strokeStyle='#174f9c'; ctx.lineWidth=7; ctx.lineCap='round';
+    const legSwing = p.jumping ? 3 : Math.sin(frame*.22)*4;
+    ctx.beginPath(); ctx.moveTo(p.x+15,p.y+39); ctx.lineTo(p.x+12+legSwing,p.y+51);
+    ctx.moveTo(p.x+29,p.y+39); ctx.lineTo(p.x+32-legSwing,p.y+51); ctx.stroke();
+    // thân
+    ctx.fillStyle='#1878d1'; roundRect(p.x+7,p.y+18,29,27,7); 
+    // khăn/cổ áo
+    ctx.fillStyle='#e94452'; ctx.beginPath(); ctx.moveTo(p.x+17,p.y+19); ctx.lineTo(p.x+23,p.y+19); ctx.lineTo(p.x+22,p.y+33); ctx.lineTo(p.x+18,p.y+28); ctx.fill();
+    // đầu
+    ctx.fillStyle='#f4bd91'; ctx.beginPath(); ctx.arc(p.x+22,p.y+12,14,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#4b3024'; ctx.beginPath(); ctx.arc(p.x+21,p.y+7,14,Math.PI,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#17324d'; ctx.beginPath(); ctx.arc(p.x+27,p.y+12,2,0,Math.PI*2); ctx.fill();
+    // tay
+    ctx.strokeStyle='#f4bd91'; ctx.lineWidth=5;
+    ctx.beginPath(); ctx.moveTo(p.x+9,p.y+24); ctx.lineTo(p.x+1,p.y+32); ctx.moveTo(p.x+34,p.y+24); ctx.lineTo(p.x+42,p.y+30); ctx.stroke();
+  }
+  function roundRect(x,y,w,h,r) {
+    ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.fill();
+  }
+
+  function showQuestion(o) {
+    const q = QUESTIONS[(o.id/2)-1];
+    questionText.textContent = `Chướng ngại vật ${o.id}/10: ${q.q}`;
+    answersEl.innerHTML = '';
+    feedbackEl.className = 'feedback'; feedbackEl.textContent = '';
+    continueBtn.style.display = 'none';
+    q.a.forEach((answer,i) => {
+      const btn = document.createElement('button');
+      btn.className = 'answer';
+      btn.textContent = `${String.fromCharCode(65+i)}. ${answer}`;
+      btn.addEventListener('click', () => chooseAnswer(i,q,o));
+      answersEl.appendChild(btn);
+    });
+    modal.classList.add('show');
+  }
+
+  function chooseAnswer(index,q,o) {
+    if (!pausedForQuestion) return;
+    [...answersEl.querySelectorAll('button')].forEach(b => b.disabled = true);
+    if (index === q.correct) {
+      score += 10; scoreEl.textContent = score;
+      feedbackEl.className = 'feedback good';
+      feedbackEl.textContent = '✅ Chính xác! Cộng 10 điểm và được đi tiếp.';
+      continueBtn.style.display = 'inline-block';
+      continueBtn.onclick = () => {
+        o.done = true;
+        passed++; passedEl.textContent = passed;
+        // Đẩy các vật cản còn lại về phía trước để tiếp tục đường đua.
+        hideQuestion(); pausedForQuestion = false; activeQuestionObstacle = null;
+        draw();
+        raf = requestAnimationFrame(loop);
+      };
+    } else {
+      feedbackEl.className = 'feedback bad';
+      feedbackEl.textContent = '❌ Chưa chính xác. Bạn phải dừng cuộc chơi.';
+      setTimeout(() => {
+        hideQuestion();
+        endGame(false, 'Bạn trả lời sai câu hỏi.');
+      }, 1200);
+    }
+  }
+
+  function hideQuestion() { modal.classList.remove('show'); }
+  function endGame(won, message) {
+    if (over) return;
+    running = false; over = true; pausedForQuestion = false;
+    if (raf) cancelAnimationFrame(raf);
+    hideQuestion();
+    draw();
+  }
+
+  document.getElementById('jumpBtn').addEventListener('click', jump);
+  document.getElementById('startBtn').addEventListener('click', resetGame);
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' || e.code === 'ArrowUp') {
+      e.preventDefault(); jump();
+    }
+  });
+  // Hỗ trợ chạm màn hình trò chơi trên điện thoại.
+  canvas.addEventListener('pointerdown', jump);
+
+  // Màn hình chờ
+  running = false; over = false;
+  player = { x:135, y:groundY-52, w:42, h:52, vy:0, jumping:false };
+  obstacles = Array.from({length:10}, (_,i)=>({id:i+1,x:620+i*340,w:38,h:48,question:[2,4,6,8,10].includes(i+1),done:false,collided:false}));
+  draw();
+})();
+</script>
+</body>
+</html>
